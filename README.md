@@ -1,0 +1,2 @@
+# STLite
+Shorter is better!
