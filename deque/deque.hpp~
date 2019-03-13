@@ -1,0 +1,316 @@
+#ifndef SJTU_DEQUE_HPP
+#define SJTU_DEQUE_HPP
+
+#include "exceptions.hpp"
+
+#include <cstddef>
+
+namespace sjtu { 
+
+template<class T>
+class deque {
+
+/*
+
+Implementation:
+	List over list is too slow and too heavy.
+	Using circular list of block arraies to maintain every sub-range of data.
+
+*/
+
+private:
+	static const int bsiz = 999;
+	static const int maxleft = bsiz / 3;
+	private :
+		struct Block;
+		class Allocator; /* Memory pool for accelerating allocation */
+	public :
+		class iterator;
+		class const_iterator;
+
+private:
+	Allocator Mem;
+	Block *End; int sz;
+	#define Begin End->nxt
+	#define Last End->pre
+
+	struct Block {
+		Block *pre, *nxt;
+		T* v;
+		int sz, l, r;
+		void reset() {pre = nxt = NULL; v = NULL; l = sz = r = 0;}
+		Block () {reset();}
+		~Block () {if (v) free(v);}
+		void allocate() {if (!v) v = (T*)malloc(sizeof(T) * bsiz);}
+		int lsiz() {return l;}
+		int rsiz() {return bsiz - r;}
+		void addl(const T& x) {
+			if (!sz) l = r = bsiz;
+			if (!lsiz()) {
+				int b = (bsiz - sz + 1) / 2;
+				for (int i = r - 1; i >= l; i--) v[i + b] = std::move(v[i]);
+				l += b, r += b;
+			}
+			--l, sz++;
+			new(v + l) T(x);
+		}
+		void addr(const T& x) {
+			if (!sz) l = r = 0;
+			if (!rsiz()) {
+				int b = (bsiz - sz + 1) / 2;
+				for (int i = l; i < r; i++) v[i - b] = std::move(v[i]);
+				l -= b, r -= b;
+			}
+			new(v + r) T(x);
+			r++, sz++;
+		}
+		void dell() {l++; sz--;}
+		void delr() {r--; sz--;}
+		void insert(int p, const T& x) {
+			if (p <= sz - p && lsiz()) {
+				--l;
+				for (int i = 0; i < p; i++) v[l + i] = std::move(v[l + i + 1]);
+			}
+			else {
+				r++;
+				for (int i = sz - 1; i >= p; i--) v[l + i + 1] = std::move(v[l + i]);
+			}
+			v[l + p] = x, sz++;
+		}
+		void erase(int p) {
+			(v + l + p)->~T();
+			if (p <= sz - p) {
+				l++;
+				for (int i = p - 1; i >= 0; i--) v[l + i] = std::move(v[l + i - 1]);
+			}
+			else {
+				r--;
+				for (int i = p; i < sz - 1; i++) v[l + i] = std::move(v[l + i + 1]);
+			}
+			sz--;
+		}
+	};
+
+	class Allocator {
+		Block *pool;
+		int cnt;
+		public:
+		Allocator () {pool = NULL; cnt = 0;}
+		~Allocator () {
+			while (pool) {
+				Block *nxt = pool->nxt;
+				delete pool;
+				pool = nxt;
+			}
+		}
+		Block* New(bool _allocate = 1) { /* Only when creating auxiliary nodes can it not allocated */  
+			Block* ret;
+			if (pool) ret = pool, pool = pool->nxt;
+			else ret = new Block, cnt ++;
+			ret->reset();
+			if (_allocate) ret->allocate();
+			else ret->sz = bsiz, ret->r = bsiz;
+			return ret;
+		}
+		Block* New(Block *pre, Block *nxt) { /* Adding block between pre and nxt */
+			Block* ret;
+			if (pool) ret = pool, pool = pool->nxt;
+			else ret = new Block, cnt++;
+			ret->reset();
+			ret->allocate();
+			ret->pre = pre, ret->nxt = nxt;
+			pre->nxt = ret, nxt->pre = ret;
+			return ret;
+		}
+		void Del(Block *x) {
+			x->nxt->pre = x->pre;
+			x->pre->nxt = x->nxt;
+			x->nxt = pool, pool = x;
+		}
+	};
+
+public:
+	class iterator {
+	public:
+		const deque* id;
+		int rk; Block* b; int pos;
+		iterator () {}
+		iterator (const deque* i, int r) : id(i), rk(r) {
+			if (rk < 0 || rk >= i->sz) throw index_out_of_bound();
+			int c = 0;
+			for (Block *x = i->Begin; x != i->End; c += x->sz, x = x->nxt) 
+				if (c + x->sz > rk) {
+					b = x, pos = rk - c; 
+					return;
+				}
+			b = id->End, pos = 0;
+		}
+		iterator (const deque *i, int r, Block *u, int v) : id(i), rk(r), b(u), pos(v) {}
+		iterator operator+(const int &n) const {return iterator(id, rk + n);}
+		iterator operator-(const int &n) const {return iterator(id, rk - n);}
+		int operator-(const iterator &rhs) const {
+			if (id != rhs.id) throw invalid_iterator();
+			return rk - rhs.rk;
+		}
+		iterator operator+=(const int &n) {return (*this = *this + n);}
+		iterator operator-=(const int &n) {return (*this = *this - n);}
+		iterator& operator++() {
+			if (pos + 1 < b->sz) return *this = iterator(id, rk + 1, b, pos + 1); 
+			else return *this = iterator(id, rk + 1, b->nxt, 0);
+		}
+		iterator operator++(int) {
+			iterator ret = *this;
+			return ++*this, ret;
+		}
+		iterator& operator--() {
+			if (pos) return *this = iterator(id, rk - 1, b, pos - 1); 
+			else return *this = iterator(id, rk - 1, b->pre, b->pre->sz - 1);
+		}
+		iterator operator--(int) {
+			iterator ret = *this;
+			return --*this, ret;
+		}
+		T& operator*() const {return b->v[b->l + pos];}
+		T* operator->() const {return b->v + b->l + pos;}
+		bool operator==(const iterator &rhs) const {return id == rhs.id && rk == rhs.rk;}
+		bool operator==(const const_iterator &rhs) const {return id == rhs.id && rk == rhs.rk;}
+		bool operator!=(const iterator &rhs) const {return !(id == rhs.id && rk == rhs.rk);}
+		bool operator!=(const const_iterator &rhs) const {return !(id == rhs.id && rk == rhs.rk);}
+	};
+	class const_iterator {
+	private:
+		const deque *id;
+		int rk;
+		Block* b; int pos;
+	public:
+		const_iterator() {}
+		const_iterator(const const_iterator &o) : id(o.id), rk(o.rk), b(o.b), pos(o.pos) {}
+		const_iterator(const iterator &o) : id(o.id), rk(o.rk), b(o.b), pos(o.pos) {}
+		T& operator*() const {return b->v[b->l + pos];}
+		T* operator->() const {return b->v + b->l + pos;}
+		bool operator==(const const_iterator &rhs) const {return id == rhs.id && rk == rhs.rk;}
+		bool operator!=(const const_iterator &rhs) const {return !(id == rhs.id && rk == rhs.rk);}
+	};
+	deque() {
+		End = Mem.New(0);
+		Begin = Last = End, sz = 0;
+	}
+	deque(const deque &o) {
+		End = Mem.New(0);
+		Begin = Last = End, sz = 0;
+		for (Block* x = o.Begin; x != o.End; x = x->nxt)
+			for (int i = 0; i < x->sz; i++) 
+				push_back(x->v[i]);
+	}
+	~deque() {
+		for (Block* x = Begin; x != End; x = x->nxt) delete x->pre;
+	}
+	void clear() {
+		for (Block *x = Begin; x != End; x = x->nxt) Mem.Del(x);
+		Begin = End, Last = End, sz = 0;
+	}
+	deque &operator=(const deque &o) {
+		if (this == &o) return *this;
+		clear();
+		for (Block* x = o.Begin; x != o.End; x = x->nxt)
+			for (int i = 0; i < x->sz; i++) 
+				push_back(x->v[i]);
+	}
+
+private:
+	void suck(Block *x) {
+		for (int i = 0; i < x->nxt->sz; i++) x->addr(x->nxt->v[i]), (&(x->nxt->v[i]))->~T();
+		Mem.Del(x->nxt);
+	}
+
+	void burst(Block *x) {
+		Mem.New(x, x->nxt);
+		for (int i = x->sz / 2 + 1; i < x->sz; i++) x->nxt->addr(x->v[i]), (&(x->v[i]))->~T(); 
+		x->r -= x->nxt->sz;
+		x->sz -= x->nxt->sz;
+	}
+
+	T& get(const size_t pos) {
+		if (pos < 0 || pos >= sz) throw index_out_of_bound();
+		int i = 0;
+		for (Block *x = Begin; x != End; x = x->nxt) {
+			if (i + x->sz > pos) return x->v[x->l + pos - i];
+			i += x->sz;
+		}
+	}
+	const T& get(const size_t pos) const {
+		if (pos < 0 || pos >= sz) throw index_out_of_bound();
+		int i = 0;
+		for (Block *x = Begin; x != End; x = x->nxt) {
+			if (i + x->sz > pos) return x->v[x->l + pos - i];
+			i += x->sz;
+		}
+	}
+
+public:
+	T & at(const size_t &pos) {return get(pos);}
+	const T & at(const size_t &pos) const {return get(pos);}
+	T & operator[](const size_t &pos) {return get(pos);}
+	const T & operator[](const size_t &pos) const {return get(pos);}
+	const T & front() const {if (sz == 0) throw container_is_empty(); return Begin->v[Begin->l];}
+	const T & back() const {if (sz == 0) throw container_is_empty(); return Last->v[Last->r - 1];}
+	iterator begin() const {return iterator(this, 0, Begin, 0);}
+	const_iterator cbegin() const {return const_iterator(begin());}
+	iterator end() const {return iterator(this, sz, End, 0);}
+	const_iterator cend() const {return const_iterator(end());}
+	iterator last() const {return iterator(this, sz - 1, Last, Last->r);}
+	bool empty() const {return sz == 0;}
+	size_t size() const {return sz;}
+
+	iterator insert(iterator pos, const T &value) {
+		if (this != pos.id) throw invalid_iterator();
+		if (pos.rk < 0 || pos.rk > sz) throw index_out_of_bound();
+			 if (pos.rk == 0 ) return push_front(value), begin();
+		else if (pos.rk == sz) return push_back(value), end();
+		if (pos.b->sz < bsiz) return sz++, pos.b->insert(pos.pos, value), pos;
+		return burst(pos.b), insert(iterator(pos.id, pos.rk), value);
+	}
+
+	iterator erase(iterator pos) {
+		if (this != pos.id) throw invalid_iterator();
+		if (pos.rk < 0 || pos.rk >= sz) throw index_out_of_bound();
+			 if (pos.rk == 0 ) 	   pop_front();
+		else if (pos.rk == sz - 1) pop_back();
+		else {
+			pos.b->erase(pos.pos);
+			if (pos.b->sz == 0) Mem.Del(pos.b);
+			else if (pos.b->sz + pos.b->nxt->sz <= bsiz / 2) suck(pos.b);
+			else if (pos.b->pre->sz + pos.b->sz <= bsiz / 2) suck(pos.b->pre);
+		}
+		sz--;
+		return iterator(pos.id, pos.rk);
+	}
+
+	void push_back(const T &value) {
+		if (Last->rsiz() == 0 && Last->lsiz() < maxleft) Mem.New(Last, End);
+		sz++, Last->addr(value);
+	}
+
+	void push_front(const T &value) {
+		if (Begin->lsiz() == 0 && Begin->rsiz() < maxleft) Mem.New(End, Begin);
+		sz++, Begin->addl(value);
+	}
+
+	void pop_back() {
+		if (sz == 0) throw container_is_empty();
+		sz--, Last->delr();
+		if (Last->sz == 0) Mem.Del(Last);
+	}
+
+	void pop_front() {
+		if (sz == 0) throw container_is_empty();
+		sz--, Begin->dell();
+		if (Begin->sz == 0) Mem.Del(Begin);
+	}
+
+#undef Begin
+#undef Last
+};
+}
+
+#endif
