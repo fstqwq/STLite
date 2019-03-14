@@ -6,7 +6,7 @@
 #include <cstring>
 
 namespace sjtu { 
-template<typename T, int bSiz = 1333, int wRat = 5>
+template<typename T, int bSiz = 999, int wRat = 3>
 class deque {
 private:
 	static const int maxW = bSiz / wRat;
@@ -78,25 +78,18 @@ private:
 		#undef cp
 	};
 	class Allocator {
-		Block *pool;
 	public:
-		Allocator () {pool = NULL;}
-		~Allocator () {while (pool) {Block *nxt = pool->nxt; delete pool; pool = nxt;}}
 		Block* New(bool isEnd = 0) {  
-			Block* ret;
-			if (pool) ret = pool, pool = pool->nxt, ret->reset();
-			else ret = new Block;
+			Block* ret = new Block;
 			if (isEnd) ret->sz = ret->r = bSiz, ret->v = 0;
 			return ret;
 		}
 		Block* New(Block *pre, Block *nxt) {
-			Block* ret;
-			if (pool) ret = pool, pool = pool->nxt, ret->reset();
-			else ret = new Block;
+			Block* ret = new Block;
 			ret->pre = pre, ret->nxt = nxt, pre->nxt = ret, nxt->pre = ret;
 			return ret;
 		}
-		void Del(Block *x) {x->nxt->pre = x->pre, x->pre->nxt = x->nxt, x->nxt = pool, pool = x;}
+		void Del(Block *x) {x->nxt->pre = x->pre, x->pre->nxt = x->nxt; delete x;}
 	};
 
 public:
@@ -246,4 +239,4 @@ public:
 	#undef Last
 };
 }
-#endif //Am I shortest?
+#endif //Am I fastest?
