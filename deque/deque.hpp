@@ -213,7 +213,7 @@ private:
 	}
 
 	T& get(const size_t pos) {
-		int i = 0;
+		size_t i = 0;
 		for (Block *x = Begin; x != End; x = x->nxt) {
 			if (i + x->sz > pos) return x->v[x->l + pos - i];
 			i += x->sz;
@@ -221,7 +221,7 @@ private:
 		throw index_out_of_bound();
 	}
 	const T& get(const size_t pos) const {
-		int i = 0;
+		size_t i = 0;
 		for (Block *x = Begin; x != End; x = x->nxt) {
 			if (i + x->sz > pos) return x->v[x->l + pos - i];
 			i += x->sz;
