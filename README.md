@@ -1,3 +1,7 @@
 # STLite
-Shorter is better!
+
+## Shorter is better!
+
+---
+
 ![short](/short.jpg)
