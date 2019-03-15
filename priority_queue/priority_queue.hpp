@@ -117,8 +117,10 @@ public:
 	 * throw container_is_empty if empty() returns true;
 	 */
 	void pop() {
-		if (sz) rt = mer(rt->l, rt->r);
-		else throw container_is_empty();
+		if (!sz) throw container_is_empty();
+		Node *l = rt->l, *r = rt->r;
+		delete rt;
+		rt = mer(l, r);
 		sz--;
 	}
 	/**

@@ -23,28 +23,29 @@ template<
 	 * You can use sjtu::map as value_type by typedef.
 	 */
 	typedef pair<const Key, T> value_type;
+
 	class allocator;
 	class const_iterator;
 	class iterator;
 	struct Node;
 
 	struct Node {
-		Node *c[2], *fa;
-		int siz;
+		int sz;
 		value_type v;
-		Node ();
-		Node (const value_t)
+		Node *c[2], *fa; // as a splay node
+		Node *pre, *nxt; // as a list node
 		bool d() {return this == fa->c[1];}
 		void setc(Node *ch, int p) {c[p] = ch; ch->fa = this;}
 		void upd() {siz = c[0]->siz + c[1]->siz + 1;}
-	} mem[MAXN], *ptr, Tnull, *null = &Tnull, *rt;
+	};
 
-	Node *newNode(int v) {
-		ptr->c[0] = ptr->c[1] = ptr->fa = null;
-		ptr->val = ptr->sum = v;
-		ptr->siz = 1;
-		ptr->lazy = ptr->rev = 0;
-		return ptr++;
+	class allocator {
+
+
+	}
+	
+	Node *newNode(const value_type &v) {
+
 	}
 
 	void rot(Node *x) {
