@@ -30,22 +30,66 @@ template<
 	struct Node;
 
 	struct Node {
-		int sz;
-		value_type v;
 		Node *c[2], *fa; // as a splay node
 		Node *pre, *nxt; // as a list node
-		bool d() {return this == fa->c[1];}
-		void setc(Node *ch, int p) {c[p] = ch; ch->fa = this;}
-		void upd() {siz = c[0]->siz + c[1]->siz + 1;}
+		value_type v;
+		bool operator < (const Node &b) const {
+			return Compare()(v.first, b.v.first);
+		}
+		friend operator < (const Key &a, const Node &n) {
+			return Compare()(a, v.first);
+		}
+		bool d() const{
+			return this == fa->c[1];
+		}
+		void setc(const Node *ch, const int& p) {
+			c[p] = ch; ch->fa = this;
+		}
 	};
 
-	class allocator {
+	allocator M;
+	Node aux, *null, *rt;
 
-
+	class auto_set_ptr {
+		auto_set_ptr () {
+			null = &aux;
+			rt = NULL;
+		}
 	}
-	
-	Node *newNode(const value_type &v) {
+	auto_set_ptr _enabled;
 
+	int sz;
+
+	class allocator {
+		Node *pool;
+		allocator () {pool = NULL;}
+		~allocator () {
+			while (pool) {
+				Node *x = pool;
+				pool = pool->nxt;
+				delete x;
+			}
+		}
+		Node *New() {
+			Node *ret = pool;
+			if (pool) pool = pool->nxt;
+			else ret = new Node;
+			return ret;
+		}
+		void Del(Node *x) {
+			x->nxt = pool, pool = x;
+		}
+	}
+
+	void add(Node* const x, Node* const fa, const int d, const Node *pre, const Node *nxt) {
+		fa->setc(x, d);
+		x->pre = pre, x->nxt = nxt;
+		pre->nxt = pre; nxt->pre = nxt;
+	}
+
+	void del(Node *x) {
+		x->pre->nxt = x->nxt, x->nxt->pre = x->pre;
+		x->fa->setc(null);
 	}
 
 	void rot(Node *x) {
@@ -54,7 +98,6 @@ template<
 		fa->fa->setc(x, fa->d());
 		fa->setc(x->c[!d], d);
 		x->setc(fa, !d);
-		fa->upd();
 		if (fa == rt) rt = x;
 	}
 
@@ -63,62 +106,54 @@ template<
 			if (x->fa->fa == fa) rot(x);
 			else x->d() == x->fa->d() ? (rot(x->fa), rot(x)) : (rot(x), rot(x));
 		}
-		x->upd();
 		return x;
 	}
 
-	Node *select(int k) {
-		for (Node *x = rt; ; ) {
-			x->relax();
-			int s = x->c[0]->siz;
-			if (k < s) x = x->c[0];
-			else if (k > s) k -= s + 1, x = x->c[1];
+	Node* tget(const Key &k) { // return pointer or throw
+		Node *x = rt;
+		while (x != null) {
+			if (k < *x) x = x->c[0];
+			else if (k > *x) x = x->c[1];
 			else return x;
 		}
+		throw index_out_of_bound();
 	}
 
-	Node *get(int l, int r) {
-		Node *L = select(l - 1), *R = select(r + 1);
-		splay(L); splay(R, L);
-		return R->c[0];
+	Node* nget(const Key &k) { // return pointer and new if needed
+		Node *x = rt, *y = rt;
+		while (x != null) {
+			if (k < *x) y = x, x = x->c[0];
+			else if (k > *x) y = x, x = x->c[1];
+			else return splay(x);
+		}
+		x = M.New();
+		if (k < *y) y->setc(x, 0);
+		else y->setc(x, 1);
+		return splay(x);
 	}
+
 
 public:
 	 /* if there is anything wrong throw invalid_iterator.*/
 	class iterator {
 	private:
-		/**
-		 * TODO add data members
-		 *   just add whatever you want.
-		 */
+		Node *x;
 	public:
-		iterator() {
-			// TODO
+		iterator() {}
+		iterator(const Node *y) : x(y) {}
+		iterator(const iterator &other) : x(other.x) {}
+		iterator & operator++() {return x = x->nxt;}
+		iterator operator++(int) {
+			iterator ret = *this;
+			++(*this);
+			return ret;
 		}
-		iterator(const iterator &other) {
-			// TODO
+		iterator & operator--() {return x = x->pre;}
+		iterator operator--(int) {
+			iterator ret = *this;
+			--(*this);
+			return ret;
 		}
-		/**
-		 * return a new iterator which pointer n-next elements
-		 *   even if there are not enough elements, just return the answer.
-		 * as well as operator-
-		 */
-		/**
-		 * TODO iter++
-		 */
-		iterator operator++(int) {}
-		/**
-		 * TODO ++iter
-		 */
-		iterator & operator++() {}
-		/**
-		 * TODO iter--
-		 */
-		iterator operator--(int) {}
-		/**
-		 * TODO --iter
-		 */
-		iterator & operator--() {}
 		/**
 		 * a operator to check whether two iterators are same (pointing to the same memory).
 		 */

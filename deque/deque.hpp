@@ -6,7 +6,7 @@
 #include <cstring>
 
 namespace sjtu {
-template<typename T, int blockSize = 1333, int wasteRatio = 5>
+template<typename T, int blockSize = 999, int wasteRatio = 3>
 class deque {
 private:
 	static const int maxW = blockSize / wasteRatio;
@@ -418,4 +418,4 @@ public:
 #undef Last
 };
 }
-#endif //Am I shortest?
+#endif
