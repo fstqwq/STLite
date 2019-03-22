@@ -9,6 +9,8 @@
 #include <cstddef>
 #include "utility.hpp"
 #include "exceptions.hpp"
+#include <map>
+//using namespace std;
 
 namespace sjtu {
 
@@ -39,13 +41,7 @@ private:
 	int sz;
 
 	class auto_set_ptr {
-		auto_set_ptr () {
-			null.aux = 1;
-			end_node.aux = 1;
-			null = &nil;
-			End = &end_node;
-			rt = End;
-			sz = 0;
+		public: auto_set_ptr () {	
 		}
 	};
 	auto_set_ptr _enabled;
@@ -58,7 +54,11 @@ private:
 			return aux == b.aux ? Compare()(v.first, b.v.first) : aux < b.aux;
 		}
 		friend bool operator < (const Key &a, const Node &n) {
-			return Compare()(a, n.v.first);
+			return n.aux ? 1 : Compare()(a, n.v.first);
+		}
+		
+		friend bool operator < (const Node &n, const Key &a) {
+			return n.aux ? 0 : Compare()(n.v.first, a);
 		}
 		bool d() const{
 			return this == fa->c[1];
@@ -70,6 +70,7 @@ private:
 
 	class allocator {
 		Node *pool;
+	public:
 		allocator () {pool = NULL;}
 		~allocator () {
 			while (pool) {
@@ -225,8 +226,16 @@ public:
 		rt = End;
 		sz = 0;
 	}
-	map() {}
+	map() {
+		nil.aux = 1;
+		end_node.aux = 1;
+		null = &nil;
+		End = &end_node;
+		rt = End;
+		sz = 0;
+	}
 	map(const map &other) {
+		this->map();
 		insert_all(other);
 	}
 	map & operator=(const map &other) {
@@ -245,19 +254,19 @@ public:
 	 * Returns a reference to the mapped value of the element with key equivalent to key.
 	 * If no such element exists, an exception of type `index_out_of_bound'
 	 */
-	T & at(const Key &key) {return tget(key);}
-	const T & at(const Key &key) const {return tget(key);}
+	T & at(const Key &key) {return tget(key)->second;}
+	const T & at(const Key &key) const {return tget(key)->second;}
 	/**
 	 * TODO
 	 * access specified element 
 	 * Returns a reference to the value that is mapped to a key equivalent to key,
 	 *   performing an insertion if such key does not already exist.
 	 */
-	T & operator[](const Key &key) {return nget(key);}
+	T & operator[](const Key &key) {return nget(key)->second;}
 	/**
 	 * behave like at() throw index_out_of_bound if such key does not exist.
 	 */
-	const T & operator[](const Key &key) const {return tget(key);}
+	const T & operator[](const Key &key) const {return tget(key)->second;}
 	/**
 	 * return a iterator to the beginning
 	 */
@@ -287,14 +296,14 @@ public:
 	pair<iterator, bool> insert(const value_type &value) {
 		Node *x = rt, *y = rt;
 		while (x != null) {
-			if (value < *x) y = x, x = x->c[0];
-			else if (*x < value) y = x, x = x->c[1];
-			else return make_pair(iter(splay(x)), 0);
+			if (value.first < *x) y = x, x = x->c[0];
+			else if (*x < value.first) y = x, x = x->c[1];
+			else return {iter(splay(x)), 0};
 		}
 		x = M.New();
-		if (value < *y) y->setc(x, 0);
+		if (value.first < *y) y->setc(x, 0);
 		else y->setc(x, 1);
-		return make_pair(iter(splay(x)), 1);
+		return {iter(splay(x)), 1};
 	}
 	/**
 	 * erase the element at pos.
@@ -325,7 +334,6 @@ public:
 	iterator find(const Key &key) {return iter(get(key));}
 	const_iterator find(const Key &key) const {return const_iterator(find(key));}
 };
-
 }
 
 #endif
