@@ -109,6 +109,20 @@ private:
 		x->setc(fa, !d);
 		if (fa == rt) rt = x;
 	}
+	
+	void rot(const Node *xx) const {
+		//sorry
+		Node *x = reinterpret_cast<Node*>(xx);
+		Node *fa = x->fa;
+		int d = x->d();
+		fa->fa->setc(x, fa->d());
+		fa->setc(x->c[!d], d);
+		x->setc(fa, !d);
+		if (fa == rt) {
+			Node **r = reinterpret_cast<Node**>(&rt);
+			*r = x;
+		}
+	}
 
 	Node* splay(Node *x, Node *fa = 0) {
 		if (!fa) fa = null;
@@ -119,13 +133,24 @@ private:
 		return x;
 	}
 
+	void splay(const Node *_x, const Node *_fa = 0) const {
+		Node *x = reinterpret_cast<Node*>(_x);
+		Node *fa = reinterpret_cast<Node*>(_fa);
+		if (!fa) fa = null;
+		while (x->fa != fa) {
+			if (x->fa->fa == fa) rot(x);
+			else x->d() == x->fa->d() ? (rot(x->fa), rot(x)) : (rot(x), rot(x));
+		}
+	}
+
+
 	
 	Node* get(const Key &k) { // return pointer or End
 		Node *x = rt;
 		while (x != null) {
 			if (k < *x) x = x->c[0];
 			else if (*x < k) x = x->c[1];
-			else return x;
+			else return splay(x);
 		}
 		return End;
 	}
@@ -135,7 +160,7 @@ private:
 		while (x != null) {
 			if (k < *x) x = x->c[0];
 			else if (*x < k) x = x->c[1];
-			else return x;
+			else return splay(x);
 		}
 		throw index_out_of_bound();
 	}
@@ -194,6 +219,7 @@ public:
 		 */
 		value_type* operator->() const noexcept {return &(*x);}
 	};
+
 	class const_iterator {
 		private:
 			iterator x;
@@ -210,32 +236,33 @@ public:
 			bool operator==(const const_iterator &rhs) const {return x == rhs.x.x;}
 			bool operator!=(const const_iterator &rhs) const {return x != rhs.x.x;}
 	};
+	
 	/**
 	 * TODO two constructors
 	 */
-	iterator iter(const Node* &x) {
+	iterator iter(const Node* x) {
 		return iterator(x, End);
 	}
 	void insert_all(const map &other) {
-		for (auto it : other) insert(it->v);
+		for (auto it : other) insert(*it);
 	}
 	void clear() {
-		for (auto it : *this) {
-			if (it->pre != End) M.Del(it->pre);
-		}
+		for (auto i = End->nxt; i != End; i = i->nxt, M.Del(i->pre));	
 		rt = End;
 		sz = 0;
 	}
-	map() {
+	void shared_construct() {
 		nil.aux = 1;
 		end_node.aux = 1;
 		null = &nil;
 		End = &end_node;
 		rt = End;
-		sz = 0;
+	}
+	map() {
+		shared_construct();
 	}
 	map(const map &other) {
-		this->map();
+		shared_construct();
 		insert_all(other);
 	}
 	map & operator=(const map &other) {
@@ -254,19 +281,19 @@ public:
 	 * Returns a reference to the mapped value of the element with key equivalent to key.
 	 * If no such element exists, an exception of type `index_out_of_bound'
 	 */
-	T & at(const Key &key) {return tget(key)->second;}
-	const T & at(const Key &key) const {return tget(key)->second;}
+	T & at(const Key &key) {return tget(key)->v.second;}
+	const T & at(const Key &key) const {return tget(key)->v.second;}
 	/**
 	 * TODO
 	 * access specified element 
 	 * Returns a reference to the value that is mapped to a key equivalent to key,
 	 *   performing an insertion if such key does not already exist.
 	 */
-	T & operator[](const Key &key) {return nget(key)->second;}
+	T & operator[](const Key &key) {return nget(key)->v.second;}
 	/**
 	 * behave like at() throw index_out_of_bound if such key does not exist.
 	 */
-	const T & operator[](const Key &key) const {return tget(key)->second;}
+	const T & operator[](const Key &key) const {return tget(key)->v.second;}
 	/**
 	 * return a iterator to the beginning
 	 */
@@ -300,6 +327,7 @@ public:
 			else if (*x < value.first) y = x, x = x->c[1];
 			else return {iter(splay(x)), 0};
 		}
+		sz++;
 		x = M.New();
 		if (value.first < *y) y->setc(x, 0);
 		else y->setc(x, 1);
@@ -316,6 +344,7 @@ public:
 		splay(x->nxt);
 		splay(x->pre);
 		M.Del(x);
+		sz--;
 	}
 	/**
 	 * Returns the number of elements with key 
@@ -324,7 +353,7 @@ public:
 	 *     since this container does not allow duplicates.
 	 * The default method of check the equivalence is !(a < b || b > a)
 	 */
-	size_t count(const Key &key) const {return get(key) != End;}
+	size_t count(const Key &key) {return get(key) != End;}
 	/**
 	 * Finds an element with key equivalent to key.
 	 * key value of the element to search for.
@@ -332,7 +361,7 @@ public:
 	 *   If no such element is found, past-the-end (see end()) iterator is returned.
 	 */
 	iterator find(const Key &key) {return iter(get(key));}
-	const_iterator find(const Key &key) const {return const_iterator(find(key));}
+//	const_iterator find(const Key &key) const {return const_iterator(find(key));}
 };
 }
 
