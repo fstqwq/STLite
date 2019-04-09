@@ -43,16 +43,28 @@ private:
 	struct Node {
 		Node *c[2], *fa; // as a splay node
 		Node *pre, *nxt; // as a list node
-		value_type v; bool aux;
+		char mem[sizeof(value_type)]; // It is only a homework, so I don't want to implement a robust memory pool
+		bool aux;
+		Node () {aux = true;}
+		Node (const value_type &z) {
+			aux = false;
+			new(mem) value_type(z);
+		}
+		value_type & v() {
+			return *(reinterpret_cast<value_type*>(mem));
+		}
+		const value_type & v() const {
+			return *(reinterpret_cast<const value_type*>(mem));
+		}
 		bool operator < (const Node &b) const {
-			return aux == b.aux ? Compare()(v.first, b.v.first) : aux < b.aux;
+			return aux == b.aux ? Compare()(v().first, b.v().first) : aux < b.aux;
 		}
 		friend bool operator < (const Key &a, const Node &n) {
-			return n.aux ? 1 : Compare()(a, n.v.first);
+			return n.aux ? 1 : Compare()(a, n.v().first);
 		}
 		
 		friend bool operator < (const Node &n, const Key &a) {
-			return n.aux ? 0 : Compare()(n.v.first, a);
+			return n.aux ? 0 : Compare()(n.v().first, a);
 		}
 		bool d() const{
 			return this == fa->c[1];
@@ -73,10 +85,11 @@ private:
 				delete x;
 			}
 		}
-		Node *New() {
+		Node *New(const value_type &v, Node *null = NULL) {
 			Node *ret = pool;
 			if (pool) pool = pool->nxt;
-			else ret = new Node;
+			else ret = new Node(v);
+			ret->fa = ret->c[0] = ret->c[1] = null;
 			return ret;
 		}
 		void Del(Node *x) {
@@ -127,17 +140,14 @@ private:
 		return x;
 	}
 
-	void splay(const Node *_x, const Node *_fa = 0) const {
+	void splay(const Node *_x, const Node *_fa = null) const {
 		Node *x = reinterpret_cast<Node*>(_x);
 		Node *fa = reinterpret_cast<Node*>(_fa);
-		if (!fa) fa = null;
 		while (x->fa != fa) {
 			if (x->fa->fa == fa) rot(x);
 			else x->d() == x->fa->d() ? (rot(x->fa), rot(x)) : (rot(x), rot(x));
 		}
 	}
-
-
 	
 	Node* get(const Key &k) { // return pointer or End
 		Node *x = rt;
@@ -166,7 +176,7 @@ private:
 			else if (*x < k) y = x, x = x->c[1];
 			else return splay(x);
 		}
-		x = M.New();
+		x = M.New(value_type(k, T()), null);
 		if (k < *y) y->setc(x, 0);
 		else y->setc(x, 1);
 		return splay(x);
@@ -198,7 +208,7 @@ public:
 		/**
 		 * a operator to check whether two iterators are same (pointing to the same memory).
 		 */
-		value_type & operator*() const {if (x == e) throw invalid_iterator(); return x->v;}
+		value_type & operator*() const {if (x == e) throw invalid_iterator(); return x->v();}
 		bool operator==(const iterator &rhs) const {return x == rhs.x;}
 		bool operator==(const const_iterator &rhs) const {return x == rhs.x.x;}
 		/**
@@ -281,19 +291,19 @@ public:
 	 * Returns a reference to the mapped value of the element with key equivalent to key.
 	 * If no such element exists, an exception of type `index_out_of_bound'
 	 */
-	T & at(const Key &key) {return tget(key)->v.second;}
-	const T & at(const Key &key) const {return tget(key)->v.second;}
+	T & at(const Key &key) {return tget(key)->v().second;}
+	const T & at(const Key &key) const {return tget(key)->v().second;}
 	/**
 	 * TODO
 	 * access specified element 
 	 * Returns a reference to the value that is mapped to a key equivalent to key,
 	 *   performing an insertion if such key does not already exist.
 	 */
-	T & operator[](const Key &key) {return nget(key)->v.second;}
+	T & operator[](const Key &key) {return nget(key)->v().second;}
 	/**
 	 * behave like at() throw index_out_of_bound if such key does not exist.
 	 */
-	const T & operator[](const Key &key) const {return tget(key)->v.second;}
+	const T & operator[](const Key &key) const {return tget(key)->v().second;}
 	/**
 	 * return a iterator to the beginning
 	 */
@@ -328,7 +338,7 @@ public:
 			else return {iter(splay(x)), 0};
 		}
 		sz++;
-		x = M.New(value);
+		x = M.New(value, null);
 		if (value.first < *y) {
 			y->setc(x, 0);
 			x->pre = y->pre;

@@ -7,7 +7,6 @@ class Integer {
 public:
 	static int counter;
 	int val;
-	Integer() {}	
 	Integer(int val) : val(val) {
 		counter++;
 	}
