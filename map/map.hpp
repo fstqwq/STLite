@@ -57,7 +57,7 @@ private:
 		bool d() const{
 			return this == fa->c[1];
 		}
-		void setc(const Node *ch, const int& p) {
+		void setc(Node *ch, const int& p) {
 			c[p] = ch; ch->fa = this;
 		}
 	};
@@ -181,15 +181,15 @@ public:
 		Node *x, *e;
 	public:
 		iterator() {}
-		iterator(const Node *y, const Node *z) : x(y), e(z) {}
+		iterator(Node *y, Node *z) : x(y), e(z) {}
 		iterator(const iterator &other) : x(other.x), e(other.e) {}
-		iterator & operator++() {if (x == e) throw invalid_iterator(); return x = x->nxt;}
+		iterator & operator++() {if (x == e) throw invalid_iterator(); x = x->nxt; return *this;}
 		iterator operator++(int) {
 			iterator ret = *this;
 			++(*this);
 			return ret;
 		}
-		iterator & operator--() {if (x->pre == e) throw invalid_iterator(); return x = x->pre;}
+		iterator & operator--() {if (x->pre == e) throw invalid_iterator(); x = x->pre; return *this;}
 		iterator operator--(int) {
 			iterator ret = *this;
 			--(*this);
@@ -220,13 +220,13 @@ public:
 			const_iterator(const iterator &other) : x(other) {}
 			const_iterator(const const_iterator &other) : x(other.x) {}
 			const_iterator & operator ++ ()  {++x; return *this;}
-			const_iterator operator ++ (int) {const_iterator ret(*this); ++x; return *this;}
+			const_iterator operator ++ (int) {const_iterator ret(*this); ++x; return ret;}
 			const_iterator & operator -- ()  {--x; return *this;}
-			const_iterator operator -- (int) {const_iterator ret(*this); --x; return *this;}
+			const_iterator operator -- (int) {const_iterator ret(*this); --x; return ret;}
 			const value_type & operator*() const {return *x;}
 			const value_type* operator->() const noexcept {return &(*x);}
-			bool operator==(const const_iterator &rhs) const {return x == rhs.x.x;}
-			bool operator!=(const const_iterator &rhs) const {return x != rhs.x.x;}
+			bool operator==(const const_iterator &rhs) const {return x == rhs.x;}
+			bool operator!=(const const_iterator &rhs) const {return x != rhs.x;}
 			friend bool operator!=(const const_iterator &lhs, const iterator &rhs) {return lhs.x != rhs;}
 			friend bool operator!=(const iterator &lhs, const const_iterator &rhs) {return lhs != rhs.x;}
 	};
@@ -234,11 +234,11 @@ public:
 	/**
 	 * TODO two constructors
 	 */
-	iterator iter(const Node* x) const {
+	iterator iter(Node* x) const {
 		return iterator(x, End);
 	}
 	void insert_all(const map &other) {
-		for (auto it : other) insert(*it);
+		for (auto it : other) insert(it);
 	}
 	void clear() {
 		for (auto i = End->nxt; i != End; i = i->nxt, M.Del(i->pre));	
@@ -246,6 +246,7 @@ public:
 		sz = 0;
 	}
 	void shared_construct() {
+		sz = 0;
 		nil.aux = 1;
 		end_node.aux = 1;
 		null = &nil;
