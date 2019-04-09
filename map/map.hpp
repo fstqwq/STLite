@@ -40,12 +40,6 @@ private:
 	Node end_node, nil, *null, *rt, *End;
 	int sz;
 
-	class auto_set_ptr {
-		public: auto_set_ptr () {	
-		}
-	};
-	auto_set_ptr _enabled;
-
 	struct Node {
 		Node *c[2], *fa; // as a splay node
 		Node *pre, *nxt; // as a list node
@@ -211,13 +205,11 @@ public:
 		 * some other operator for iterator.
 		 */
 		bool operator!=(const iterator &rhs) const {return x != rhs.x;}
-		bool operator!=(const const_iterator &rhs) const {return x != rhs.x.x;}
-
 		/**
 		 * for the support of it->first. 
 		 * See <http://kelvinh.github.io/blog/2013/11/20/overloading-of-member-access-operator-dash-greater-than-symbol-in-cpp/> for help.
 		 */
-		value_type* operator->() const noexcept {return &(*x);}
+		value_type* operator->() const noexcept {return &(*(*this));}
 	};
 
 	class const_iterator {
@@ -235,12 +227,14 @@ public:
 			const value_type* operator->() const noexcept {return &(*x);}
 			bool operator==(const const_iterator &rhs) const {return x == rhs.x.x;}
 			bool operator!=(const const_iterator &rhs) const {return x != rhs.x.x;}
+			friend bool operator!=(const const_iterator &lhs, const iterator &rhs) {return lhs.x != rhs;}
+			friend bool operator!=(const iterator &lhs, const const_iterator &rhs) {return lhs != rhs.x;}
 	};
 	
 	/**
 	 * TODO two constructors
 	 */
-	iterator iter(const Node* x) {
+	iterator iter(const Node* x) const {
 		return iterator(x, End);
 	}
 	void insert_all(const map &other) {
@@ -297,13 +291,13 @@ public:
 	/**
 	 * return a iterator to the beginning
 	 */
-	iterator begin() {return iter(End->nxt);}
+	iterator begin() const {return iter(End->nxt);}
 	const_iterator cbegin() const {return const_iterator(begin());}
 	/**
 	 * return a iterator to the end
 	 * in fact, it returns past-the-end.
 	 */
-	iterator end() {return iter(End);}
+	iterator end() const {return iter(End);}
 	const_iterator cend() const {return const_iterator(end());}
 	/**
 	 * checks whether the container is empty
