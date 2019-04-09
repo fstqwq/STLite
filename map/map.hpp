@@ -251,6 +251,11 @@ public:
 		end_node.aux = 1;
 		null = &nil;
 		End = &end_node;
+		End->fa = null;
+		End->nxt = End;
+		End->pre = End;
+		End->c[0] = null;
+		End->c[1] = null;
 		rt = End;
 	}
 	map() {
@@ -323,9 +328,22 @@ public:
 			else return {iter(splay(x)), 0};
 		}
 		sz++;
-		x = M.New();
-		if (value.first < *y) y->setc(x, 0);
-		else y->setc(x, 1);
+		x = M.New(value);
+		if (value.first < *y) {
+			y->setc(x, 0);
+			x->pre = y->pre;
+			x->pre->nxt = x;
+			x->nxt = y;
+			y->pre = x;
+		}
+		else {
+			y->setc(x, 1);
+			x->nxt = y->nxt;
+			x->nxt->pre = x;
+			x->pre = y;
+			y->nxt = x;
+		}
+		
 		return {iter(splay(x)), 1};
 	}
 	/**
@@ -338,6 +356,9 @@ public:
 		Node *x = splay(pos.x);
 		splay(x->nxt);
 		splay(x->pre);
+		x->fa->setc(null, x->d());
+		x->nxt->pre = x->pre;
+		x->pre->nxt = x->nxt;
 		M.Del(x);
 		sz--;
 	}
