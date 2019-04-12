@@ -55,6 +55,11 @@ void tester(void) {
 			assert(result.second);
 		}
 	}
+	using namespace std;
+	for (auto v : map) {
+		cout << v.second << endl;
+		if (v.second > "9") break;
+	}
 	//	test: count(), find(), erase()
 	for (int i = 0; i < 100000; ++i) {
 		if (i > 1896 && i <= 2016) {
