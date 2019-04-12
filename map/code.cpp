@@ -1,5 +1,5 @@
-#include "map.hpp"
 #include <iostream>
+#include "map.hpp"
 #include <cassert>
 #include <string>
 

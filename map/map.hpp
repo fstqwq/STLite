@@ -299,7 +299,11 @@ public:
 		M.Del(x);
 		sz--;
 	}
-	size_t count(const Key &key) {return get(key) != End;}
+	size_t count(const Key &key) {
+		std::cerr << key.val << " " << (get(key) != End) << std::endl;
+		
+		
+		return get(key) != End;}
 	iterator find(const Key &key) {return iter(get(key));}
 	const_iterator find(const Key &key) const {
 		map *x = reinterpret_cast<map*>(this); // surely const function!
