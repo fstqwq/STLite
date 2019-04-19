@@ -1,5 +1,5 @@
-#include <iostream>
 #include "map.hpp"
+#include <iostream>
 #include <cassert>
 #include <string>
 
@@ -7,6 +7,7 @@ class Integer {
 public:
 	static int counter;
 	int val;
+	
 	Integer(int val) : val(val) {
 		counter++;
 	}
@@ -35,12 +36,8 @@ public:
 };
 
 void tester(void) {
-	//	test: constructor
 	sjtu::map<Integer, std::string, Compare> map;
-	//	test: empty(), size()
-	assert(map.empty() && map.size() == 0);
-	//	test: operator[], insert()
-	for (int i = 0; i < 100000; ++i) {
+	for (int i = 0; i < 1000000; ++i) {
 		std::string string = "";
 		for (int number = i; number; number /= 10) {
 			char digit = '0' + number % 10;
@@ -55,69 +52,37 @@ void tester(void) {
 			assert(result.second);
 		}
 	}
-	using namespace std;
-	for (auto v : map) {
-		cout << v.second << endl;
-		if (v.second > "9") break;
-	}
-	//	test: count(), find(), erase()
-	for (int i = 0; i < 100000; ++i) {
-		if (i > 1896 && i <= 2016) {
-			continue;
+	int counter = 0;
+	for (int time = 0; time <= 30; time++) {
+		sjtu::map<Integer, std::string, Compare>::const_iterator const_iterator;
+		const_iterator = map.cbegin();
+		while (const_iterator != map.cend()) {
+			const Integer integer(const_iterator->first);
+			if ((++counter) % 1000 == 0) {
+				std::cout << const_iterator->second << " ";
+			}
+			const_iterator++;
 		}
-		assert(map.count(Integer(i)) == 1);
-		assert(map.find(Integer(i)) != map.end());
-		map.erase(map.find(Integer(i)));
-	}
-	//	test: constructor, operator=, clear();
-	for (int i = 0; i < (int)map.size(); ++i) {
-		sjtu::map<Integer, std::string, Compare> copy(map);
-		map.clear();
-		std::cout << map.size() << " " << copy.size() << " ";
-		map = copy;
-		copy.clear();
-		std::cout << map.size() << " " << copy.size() << " ";
-		copy = map;
-		map.clear();
-		std::cout << map.size() << " " << copy.size() << " ";
-		map = copy;
-		copy.clear();
-		std::cout << map.size() << " " << copy.size() << " ";
-	}
-	std::cout << std::endl;
-	//	test: const_iterator, cbegin(), cend(), operator++, at()
-	sjtu::map<Integer, std::string, Compare>::const_iterator const_iterator;
-	const_iterator = map.cbegin();
-	while (const_iterator != map.cend()) {
-		const Integer integer(const_iterator->first);
-		const_iterator++;
-		std::cout << map.at(integer) << " ";
-	}
-	std::cout << std::endl;
-	//	test: iterator, operator--, operator->
-	sjtu::map<Integer, std::string, Compare>::iterator iterator;
-	iterator = map.end();
-	while (true) {
-		sjtu::map<Integer, std::string, Compare>::iterator peek = iterator;
-		if (peek == map.begin()) {
-			std::cout << std::endl;
-			break;
+		sjtu::map<Integer, std::string, Compare>::iterator iterator;
+		iterator = map.begin();
+		while (iterator != map.end()) {
+			const Integer integer(iterator->first);
+			std::string tmp = iterator->second;
+			iterator->second = "SJTU";
+			if ((++counter) % 1000 == 0) {
+				std::cout << iterator->second << " ";
+			}
+			iterator->second = tmp;
+			iterator++;
 		}
-		std::cout << (--iterator)->second << " ";
+		std::cout << map.size() << std::endl;
 	}
-	//	test: erase()
-	while (map.begin() != map.end()) {
-		map.erase(map.begin());
-	}
-	assert(map.empty() && map.size() == 0);
-	//	test: operator[]
-	for (int i = 0; i < 100000; ++i) {
-		std::cout << map[Integer(i)];
-	}
-	std::cout << map.size() << std::endl;
 }
 
 int main(void) {
+	std::ios::sync_with_stdio(false);
+	std::cin.tie(0);
+	std::cout.tie(0);
 	tester();
 	std::cout << Integer::counter << std::endl;
 }

@@ -1,16 +1,15 @@
 /**
  * implement a container like std::map
  */
+
+#pragma GCC optimize("O3")
 #ifndef SJTU_MAP_HPP
 #define SJTU_MAP_HPP
 
-// only for std::less<T>
 #include <functional>
 #include <cstddef>
 #include "utility.hpp"
 #include "exceptions.hpp"
-#include <map>
-//using namespace std;
 
 namespace sjtu {
 
@@ -19,12 +18,6 @@ template<
 	class T,
 	class Compare = std::less<Key>
 > class map {
-	/**
-	 * the internal type of data.
-	 * it should have a default constructor, a copy constructor.
-	 * You can use sjtu::map as value_type by typedef.
-	 */
-	typedef pair<const Key, T> value_type;
 
 private:
 	class allocator;
@@ -33,6 +26,7 @@ private:
 public:
 	class const_iterator;
 	class iterator;
+	typedef sjtu::pair<const Key, T> value_type;
 
 private:
 
@@ -45,16 +39,19 @@ private:
 		Node *pre, *nxt; // as a list node
 		char mem[sizeof(value_type)];
 		bool aux;
-		Node () {aux = true; memset(mem, 0, sizeof mem);}
+		Node () {aux = true;}
 		Node (const value_type &z) {
 			aux = false;
 			new(mem) value_type(z);
 		}
-		value_type & v() {
-			return *(reinterpret_cast<value_type*>(mem));
+		~Node () {
+			if (!aux) v().~value_type();
 		}
-		const value_type & v() const {
-			return *(reinterpret_cast<const value_type*>(mem));
+		inline value_type & v() {
+			return *(value_type*)(mem);
+		}
+		inline const value_type & v() const {
+			return *(value_type*)(mem);
 		}
 		bool operator < (const Node &b) const {
 			return aux == b.aux ? Compare()(v().first, b.v().first) : aux < b.aux;
@@ -83,30 +80,45 @@ private:
 			while (pool) {
 				Node *x = pool;
 				pool = pool->nxt;
+				x->aux = 1;
 				delete x;
 			}
 		}
 		Node *New(const value_type &v, Node *null = NULL) {
 			Node *ret = pool;
-			if (pool) pool = pool->nxt;
-			else ret = new Node(v);
+			if (pool) {
+				pool = pool->nxt;
+				new(ret->mem) value_type(v);
+			} else ret = new Node(v);
 			ret->fa = ret->c[0] = ret->c[1] = null;
+			ret->pre = ret->nxt = ret;
 			return ret;
 		}
 		void Del(Node *x) {
+			x->~Node();
 			x->nxt = pool, pool = x;
 		}
 	};
 
-	void add(Node* const x, Node* const fa, const int d, Node* const pre, Node* const nxt) {
+	void add(Node* const x, Node* const fa, const int d) {
+		Node* const pre = d ? fa : fa->pre;
+		Node* const nxt = d ? fa->nxt : fa;
 		fa->setc(x, d);
 		x->pre = pre, x->nxt = nxt;
 		pre->nxt = x; nxt->pre = x;
+		sz++;
 	}
 
-	void del(Node *x) {
-		x->pre->nxt = x->nxt, x->nxt->pre = x->pre;
-		x->fa->setc(null);
+	void del(Node *x) { // x as a leaf
+		x->fa->setc(null, x->d());
+		x->nxt->pre = x->pre, x->pre->nxt = x->nxt;
+		M.Del(x);
+		sz--;
+	}
+	void del_(Node *x) { // x as a list node when clear
+		x->nxt->pre = x->pre, x->pre->nxt = x->nxt;
+		M.Del(x);
+		sz--;
 	}
 
 	void rot(Node *x) {
@@ -118,9 +130,10 @@ private:
 		if (fa == rt) rt = x;
 	}
 	
-	Node* splay(Node *x) {
-		while (x->fa != null) {
-			if (x->fa->fa == null) rot(x);
+	Node* splay(Node *x, Node *fa = 0) {
+		if (!fa) fa = null;
+		while (x->fa != fa) {
+			if (x->fa->fa == fa) rot(x);
 			else x->d() == x->fa->d() ? (rot(x->fa), rot(x)) : (rot(x), rot(x));
 		}
 		return x;
@@ -132,41 +145,30 @@ private:
 			else return splay(x);\
 		}
 	
-	Node* get(const Key &k) { // return pointer or End
+	inline Node* get(const Key &k) { // return pointer or End
 		Node *x = rt, *y = null;
 		binary_search();
 		if (y != null) splay(y);
 		return End;
 	}
 
-	Node* tget(const Key &k) { // [throw] return pointer or throw
+	inline Node* tget(const Key &k) { // [throw] return pointer or throw
 		Node *x = rt, *y = null;
 		binary_search();
 		if (y != null) splay(y);
 		throw index_out_of_bound();
 	}
 
-	Node* nget(const Key &k) { // [new] return pointer and new if needed
+	inline Node* nget(const Key &k) { // [new] return pointer and new if needed
 		Node *x = rt, *y = null;
 		binary_search();
 		bool d = *y < k;
-		add(x = M.New(value_type(k, T()), null), y, d, d ? y : y->pre, d ? y->nxt : y);
+		add(x = M.New(value_type(k, T()), null), y, d);
 		return splay(x);
 	}
 
 
 public:
-/*	void dfs(Node *x = 0) {
-		using namespace std;
-		if (!x) x = rt, cerr << "start dfs rt = " << rt->v().first << endl;
-		if (x == null) return;
-		cerr << "x : " << x->v().first << endl;
-		cerr << "L : " << x->c[0]->v().first << endl;
-		cerr << "R : " << x->c[1]->v().first << endl;
-		dfs(x->c[0]);
-		dfs(x->c[1]);
-	}*/
-
 	class iterator {
 		friend map;
 	private:
@@ -188,10 +190,9 @@ public:
 			return ret;
 		}
 		value_type & operator*() const {if (x == e) throw invalid_iterator(); return x->v();}
+		value_type* operator->() const noexcept {return &(x->v());}
 		bool operator==(const iterator &rhs) const {return x == rhs.x;}
-		bool operator==(const const_iterator &rhs) const {return x == rhs.x.x;}
 		bool operator!=(const iterator &rhs) const {return x != rhs.x;}
-		value_type* operator->() const noexcept {return &(*(*this));}
 	};
 
 	class const_iterator {
@@ -209,32 +210,35 @@ public:
 			const value_type* operator->() const noexcept {return &(*x);}
 			bool operator==(const const_iterator &rhs) const {return x == rhs.x;}
 			bool operator!=(const const_iterator &rhs) const {return x != rhs.x;}
+			friend bool operator==(const const_iterator &lhs, const iterator &rhs) {return lhs.x == rhs;}
+			friend bool operator==(const iterator &lhs, const const_iterator &rhs) {return lhs == rhs.x;}
 			friend bool operator!=(const const_iterator &lhs, const iterator &rhs) {return lhs.x != rhs;}
 			friend bool operator!=(const iterator &lhs, const const_iterator &rhs) {return lhs != rhs.x;}
 	};
 
-	iterator iter(Node* x) const {
+	inline iterator iter(Node* x) const {
 		return iterator(x, End);
 	}
-	void insert_all(const map &other) {
-		for (auto it : other) insert(it);
+	inline void insert_all(const map &other) {
+		for (auto v : other) insert(v);
 	}
 	void clear() {
-		for (auto i = End->nxt; i != End; i = i->nxt, M.Del(i->pre));	
+		while (End->nxt != End) del_(End->nxt);
+		sz = 0;
 		rt = End;
-		sz = 0;
+		rt->pre = rt->nxt = rt;
+		rt->fa = rt->c[0] = rt->c[1] = null;
 	}
-	void shared_construct() {
+	inline void shared_construct() {
 		sz = 0;
-		nil.aux = 1;
-		end_node.aux = 1;
+
 		null = &nil;
+		null->nxt = null->pre = null;
+		null->fa = null->c[0] = null->c[1] = null;
 		End = &end_node;
-		End->nxt = End;
-		End->pre = End;
-		End->fa = null;
-		End->c[0] = null;
-		End->c[1] = null;
+
+		End->nxt = End->pre = End;
+		End->fa = End->c[0] = End->c[1] = null;
 		rt = End;
 	}
 	map() {
@@ -245,17 +249,19 @@ public:
 		insert_all(other);
 	}
 	map & operator=(const map &other) {
-		clear();
-		insert_all(other);
+		if (this != &other) { 
+			clear();
+			insert_all(other);
+		}
 		return *this;
 	}
 	~map() {
 		clear();
 	}
 	T & at(const Key &key) {return tget(key)->v().second;}
-	const T & at(const Key &key) const {return tget(key)->v().second;}
+	const T & at(const Key &key) const {return const_cast<map*>(this)->tget(key)->v().second;}
 	T & operator[](const Key &key) {return nget(key)->v().second;}
-	const T & operator[](const Key &key) const {return tget(key)->v().second;}
+	const T & operator[](const Key &key) const {return const_cast<map*>(this)->tget(key)->v().second;}
 	iterator begin() const {return iter(End->nxt);}
 	const_iterator cbegin() const {return const_iterator(begin());}
 	iterator end() const {return iter(End);}
@@ -263,51 +269,33 @@ public:
 	bool empty() const {return sz == 0;}
 	int size() const {return sz;}
 	pair<iterator, bool> insert(const value_type &value) {
-		Node *x = rt, *y = rt;
+		Node *x = rt, *y = null;
 		while (x != null) {
 			if (value.first < *x) y = x, x = x->c[0];
 			else if (*x < value.first) y = x, x = x->c[1];
 			else return {iter(splay(x)), 0};
 		}
-		sz++;
+
 		x = M.New(value, null);
-		if (value.first < *y) {
-			y->setc(x, 0);
-			x->pre = y->pre;
-			x->pre->nxt = x;
-			x->nxt = y;
-			y->pre = x;
-		}
-		else {
-			y->setc(x, 1);
-			x->nxt = y->nxt;
-			x->nxt->pre = x;
-			x->pre = y;
-			y->nxt = x;
-		}
-		
+		add(x, y, *y < value.first);
 		return {iter(splay(x)), 1};
 	}
 	void erase(iterator pos) {
 		if (End != pos.e || End == pos.x) throw invalid_iterator();
-		Node *x = splay(pos.x);
-		splay(x->nxt);
-		splay(x->pre);
-		x->fa->setc(null, x->d());
-		x->nxt->pre = x->pre;
-		x->pre->nxt = x->nxt;
-		M.Del(x);
-		sz--;
+		Node *x = pos.x;
+		if (x->pre == End) {
+			splay(x->nxt);
+		}
+		else {
+			splay(x->pre);
+			splay(x->nxt, x->pre);
+		}
+		del(x);
 	}
-	size_t count(const Key &key) {
-		std::cerr << key.val << " " << (get(key) != End) << std::endl;
-		
-		
-		return get(key) != End;}
+	size_t count(const Key &key) const {return const_cast<map*>(this)->get(key) != End;}
 	iterator find(const Key &key) {return iter(get(key));}
 	const_iterator find(const Key &key) const {
-		map *x = reinterpret_cast<map*>(this); // surely const function!
-		return x->find(key);
+		return const_cast<map*>(this)->find(key); // surely const function!
 	}
 };
 }
